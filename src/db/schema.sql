@@ -56,12 +56,16 @@ CREATE TABLE IF NOT EXISTS receipt_items (
   category_id TEXT REFERENCES categories(id) ON DELETE SET NULL
 );
 
--- Not wired up yet -- placeholders for the future email-sync pipeline.
+-- An OAuth-connected mailbox that gets polled for financial emails.
 CREATE TABLE IF NOT EXISTS email_connections (
   id TEXT PRIMARY KEY,
   provider TEXT NOT NULL,
+  email_address TEXT,
   access_token TEXT NOT NULL,
   refresh_token TEXT,
+  token_expires_at TIMESTAMPTZ,
+  default_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+  last_synced_at TIMESTAMPTZ,
   connected_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -71,6 +75,24 @@ CREATE TABLE IF NOT EXISTS category_rules (
   category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS category_rules_match_merchant_idx ON category_rules (match_merchant);
+
+-- Maps a sender email/domain fragment (e.g. "paystack.com") to the account
+-- its transactions should post against, since a parsed email has no
+-- account id of its own.
+CREATE TABLE IF NOT EXISTS account_senders (
+  id TEXT PRIMARY KEY,
+  pattern TEXT NOT NULL,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Dedup key for transactions created from a parsed email; NULL for
+-- manually-entered transactions, so the uniqueness only applies when set.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS external_message_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS transactions_external_message_id_idx
+  ON transactions (external_message_id) WHERE external_message_id IS NOT NULL;
 
 INSERT INTO categories (id, name, color) VALUES
   ('food-groceries', 'Food & groceries', '#358760'),

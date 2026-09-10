@@ -57,6 +57,19 @@ async function create({ accountId, categoryId, merchant, note, amount, type, dat
   return get(id);
 }
 
+async function createFromEmail({ accountId, categoryId, merchant, note, amount, type, date, externalMessageId }) {
+  const id = crypto.randomUUID();
+  const { rows } = await connection.query(
+    `INSERT INTO transactions
+       (id, account_id, category_id, merchant, note, amount, type, date, reviewed, source, external_message_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, 'Email', $9)
+     ON CONFLICT (external_message_id) WHERE external_message_id IS NOT NULL DO NOTHING
+     RETURNING id`,
+    [id, accountId, categoryId, merchant, note ?? "", amount, type, date, externalMessageId]
+  );
+  return rows[0] ? get(rows[0].id) : null;
+}
+
 async function update(id, fields) {
   const { rows } = await connection.query(
     `UPDATE transactions SET
@@ -75,4 +88,4 @@ async function remove(id) {
   return rowCount > 0;
 }
 
-module.exports = { list, get, create, update, remove };
+module.exports = { list, get, create, createFromEmail, update, remove };
