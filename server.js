@@ -1,33 +1,30 @@
 require("dotenv").config();
 
 const app = require("./src/app");
-const port = process.env.PORT || 3000;
+const connection = require("./src/config/database");
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+const port = process.env.PORT || 3000;
+let server;
 
 async function startServer() {
   try {
     await connection.query("SELECT NOW()");
-
     console.log("✅ Database connected successfully");
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+
+    server = app.listen(port, () => {
+      console.log(`🚀 Server running on http://localhost:${port}`);
     });
   } catch (error) {
     console.error("❌ Database connection failed");
     console.error("Error message:", error.message);
     console.error("Error code:", error.code);
-
     process.exit(1);
   }
 }
 
-startServer();
- 
 async function stopServer() {
   try {
+    if (server) server.close();
     await connection.end();
     console.log("✅ Database connection closed");
   } catch (error) {
@@ -40,4 +37,6 @@ async function stopServer() {
 }
 
 process.on("SIGINT", stopServer);
-process.on("SIGTERM", stopServer);  
+process.on("SIGTERM", stopServer);
+
+startServer();
